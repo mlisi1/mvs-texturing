@@ -19,6 +19,7 @@
 #include <mve/image.h>
 #include <mve/image_io.h>
 #include <mve/image_tools.h>
+#include <util/file_system.h>
 
 #include "tri.h"
 #include "settings.h"
@@ -50,7 +51,10 @@ class TextureView {
         int width;
         int height;
         std::string image_file;
+        std::string mask_image_file;
         mve::ImageBase::Ptr image;
+        mve::ImageBase::Ptr mask_image;
+        mve::ByteImage::Ptr image_mask;
         mve::ImageBase::Ptr gradient_magnitude;
         std::vector<bool> validity_mask;
         bool grayscale;
@@ -77,7 +81,7 @@ class TextureView {
 //        math::Vec3f get_pixel_values(math::Vec2f const & pixel) const;
 
         /** Constructs a TextureView from the give mve::CameraInfo containing the given image. */
-        TextureView(std::size_t id, mve::CameraInfo const & camera, std::string const & image_file);
+        TextureView(std::size_t id, mve::CameraInfo const & camera, std::string const & image_file, std::string const & mask_image_file);
 
         /** Returns the position. */
         math::Vec3f get_pos(void) const;
@@ -93,6 +97,11 @@ class TextureView {
         get_image(void) const;
         mve::ImageBase::Ptr
         get_image(void) const;
+        template <typename T>
+        typename mve::Image<T>::Ptr
+        get_mask(void) const;
+        mve::ImageBase::Ptr
+        get_mask(void) const;
 
         /** Returns a reference pointer to the magnitude gradient. */
         template <typename T>
@@ -174,6 +183,21 @@ inline mve::ImageBase::Ptr
 TextureView::get_image(void) const{
     assert(image != NULL);
     return image;
+}
+
+
+template <typename T>
+inline typename mve::Image<T>::Ptr
+TextureView::get_mask(void) const {
+    assert(mask_image != NULL);
+    typename mve::Image<T>::Ptr img = std::dynamic_pointer_cast<mve::Image<T>>(mask_image);
+    return img;
+}
+
+inline mve::ImageBase::Ptr
+TextureView::get_mask(void) const{
+    assert(mask_image != NULL);
+    return mask_image;
 }
 
 template <typename T>

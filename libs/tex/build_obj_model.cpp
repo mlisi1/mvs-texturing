@@ -66,6 +66,7 @@ build_model(mve::TriangleMesh::ConstPtr mesh,
         const std::size_t n = material_lib.size();
         material.name = std::string("material") + util::string::get_filled(n, 4);
         material.diffuse_map = texture_atlas->get_image();
+        material.mask_diffuse_map = texture_atlas->get_mask();
 
         if (texture_atlas->is_grayscale()){
             // Use only first channel (other two should be the same)

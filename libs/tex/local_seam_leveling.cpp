@@ -166,7 +166,8 @@ local_seam_leveling(UniGraph const & graph, mve::TriangleMesh::ConstPtr mesh,
             TexturePatch::Ptr texture_patch = texture_patches->at(projection_info.texture_patch_id);
             if (texture_patch->get_label() == 0) continue;
             math::Vec3f color = texture_patch->get_pixel_value(projection_info.projection);
-            color_accum.add(color, 1.0f);
+            if (color[0] <= 0.9 && color[1] <= 0.9 && color[2] <= 0.9 &&
+                color[0] >= 0.1 && color[1] >= 0.1 && color[2] >= 0.1) color_accum.add(color, 1.0f);
         }
 	if (color_accum.w == 0.0f) continue;
 
@@ -182,7 +183,11 @@ local_seam_leveling(UniGraph const & graph, mve::TriangleMesh::ConstPtr mesh,
 
     ProgressCounter texture_patch_counter("\tBlending texture patches", texture_patches->size());
     #pragma omp parallel for schedule(dynamic)
+#if !defined(_MSC_VER)
     for (std::size_t i = 0; i < texture_patches->size(); ++i) {
+#else
+    for (std::int64_t i = 0; i < texture_patches->size(); ++i) {
+#endif
         TexturePatch::Ptr texture_patch = texture_patches->at(i);
         mve::FloatImage::Ptr image = texture_patch->get_image()->duplicate();
 

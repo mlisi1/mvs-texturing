@@ -16,6 +16,7 @@
 /** Struct containing the commandline arguments at runtime. */
 struct Arguments {
     std::string in_scene;
+    std::string in_mask_scene;
     std::string in_mesh;
     std::string out_prefix;
 

@@ -17,8 +17,8 @@
 #include "texture_patch.h"
 
 TexturePatch::TexturePatch(int label, std::vector<std::size_t> const & faces,
-    std::vector<math::Vec2f>  const & texcoords, mve::FloatImage::Ptr image)
-    : label(label), faces(faces), texcoords(texcoords), image(image) {
+    std::vector<math::Vec2f>  const & texcoords, mve::FloatImage::Ptr image, mve::FloatImage::Ptr mask_image)
+    : label(label), faces(faces), texcoords(texcoords), image(image), mask_image(mask_image) {
 
     validity_mask = mve::ByteImage::create(get_width(), get_height(), 1);
     validity_mask->fill(255);
@@ -30,6 +30,7 @@ TexturePatch::TexturePatch(TexturePatch const & texture_patch) {
     faces = std::vector<std::size_t>(texture_patch.faces);
     texcoords = std::vector<math::Vec2f>(texture_patch.texcoords);
     image = texture_patch.image->duplicate();
+    mask_image = texture_patch.mask_image->duplicate();
     validity_mask = texture_patch.validity_mask->duplicate();
     if (texture_patch.blending_mask != NULL) {
         blending_mask = texture_patch.blending_mask->duplicate();
@@ -180,6 +181,8 @@ TexturePatch::set_pixel_value(math::Vec2i pixel, math::Vec3f color) {
 void
 TexturePatch::blend(mve::FloatImage::ConstPtr orig) {
     poisson_blend(orig, blending_mask, image, 1.0f);
+    // BLENDING SEEMS TO CREATO MORE ARTIFACTS
+    // poisson_blend(orig, blending_mask, mask_image, 1.0f);
 
     /* Invalidate all pixels outside the boundary. */
     for (int y = 0; y < blending_mask->height(); ++y) {

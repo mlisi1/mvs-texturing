@@ -10,7 +10,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <tbb/task_scheduler_init.h>
+#include <tbb/task_arena.h>
 #include <omp.h>
 
 #include <util/timer.h>
@@ -52,15 +52,12 @@ int main(int argc, char **argv) {
     if (!util::fs::dir_exists(tmp_dir.c_str())) {
         util::fs::mkdir(tmp_dir.c_str());
     } else {
-        std::cerr
-            << "Temporary directory \"tmp\" exists within the destination directory.\n"
-            << "Cannot continue since this directory would be delete in the end.\n"
-            << std::endl;
-        std::exit(EXIT_FAILURE);
+        std::cout << "Careful! Temporary directory \"tmp\" exists within the destination directory." << std::endl;
     }
 
     // Set the number of threads to use.
-    tbb::task_scheduler_init schedule(conf.num_threads > 0 ? conf.num_threads : tbb::task_scheduler_init::automatic);
+    tbb::task_arena arena(conf.num_threads > 0 ? conf.num_threads : tbb::this_task_arena::max_concurrency());
+
     if (conf.num_threads > 0) {
         omp_set_dynamic(0);
         omp_set_num_threads(conf.num_threads);
@@ -79,7 +76,7 @@ int main(int argc, char **argv) {
 
     std::cout << "Generating texture views: " << std::endl;
     tex::TextureViews texture_views;
-    mve::ImageType type = tex::generate_texture_views(conf.in_scene, &texture_views, tmp_dir);
+    mve::ImageType type = tex::generate_texture_views(conf.in_scene, conf.in_mask_scene, &texture_views, tmp_dir);
 
     write_string_to_file(conf.out_prefix + ".conf", conf.to_string());
     timer.measure("Loading");
@@ -172,7 +169,11 @@ int main(int argc, char **argv) {
         } else {
             ProgressCounter texture_patch_counter("Calculating validity masks for texture patches", texture_patches.size());
             #pragma omp parallel for schedule(dynamic)
+#if !defined(_MSC_VER)
             for (std::size_t i = 0; i < texture_patches.size(); ++i) {
+#else
+            for (std::int64_t i = 0; i < texture_patches.size(); ++i) {
+#endif
                 texture_patch_counter.progress<SIMPLE>();
                 TexturePatch::Ptr texture_patch = texture_patches[i];
                 std::vector<math::Vec3f> patch_adjust_values(texture_patch->get_faces().size() * 3, math::Vec3f(0.0f));

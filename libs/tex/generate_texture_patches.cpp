@@ -19,8 +19,8 @@
 
 TEX_NAMESPACE_BEGIN
 
-#define MAX_HOLE_NUM_FACES 100
-#define MAX_HOLE_PATCH_SIZE 100
+#define MAX_HOLE_NUM_FACES 1000
+#define MAX_HOLE_PATCH_SIZE 1000
 
 template <typename T>
 T clamp_nan_low(T const & v, T const & lo, T const & hi) {
@@ -40,7 +40,11 @@ T clamp(T const & v, T const & lo, T const & hi) {
 void merge_vertex_projection_infos(std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos) {
     /* Merge vertex infos within the same texture patch. */
     #pragma omp parallel for
+#if !defined(_MSC_VER)
     for (std::size_t i = 0; i < vertex_projection_infos->size(); ++i) {
+#else
+    for (std::int64_t i = 0; i < vertex_projection_infos->size(); ++i) {
+#endif
         std::vector<VertexProjectionInfo> & infos = vertex_projection_infos->at(i);
 
         std::map<std::size_t, VertexProjectionInfo> info_map;
@@ -81,6 +85,7 @@ generate_candidate(int label, TextureView const & texture_view,
     Settings const & settings) {
 
     mve::ImageBase::Ptr view_image = texture_view.get_image();
+    mve::ImageBase::Ptr mask_view_image = texture_view.get_mask();
     int min_x = view_image->width(), min_y = view_image->height();
     int max_x = 0, max_y = 0;
 
@@ -124,17 +129,26 @@ generate_candidate(int label, TextureView const & texture_view,
     }
 
     mve::FloatImage::Ptr image;
+    mve::FloatImage::Ptr mask_image;
     if (view_image->get_type() == mve::IMAGE_TYPE_FLOAT){
         mve::FloatImage::Ptr float_image = texture_view.get_image<float>();
+        mve::FloatImage::Ptr mask_float_image = texture_view.get_mask<float>();
         image = mve::image::crop<float>(float_image, width, height, min_x, min_y, *math::Vec3f(3.402823466E38, 0, 3.402823466E38));
+        mask_image = mve::image::crop<float>(mask_float_image, width, height, min_x, min_y, *math::Vec3f(3.402823466E38, 0, 3.402823466E38));
     }else if (view_image->get_type() == mve::IMAGE_TYPE_UINT16){
         mve::RawImage::Ptr raw_image = texture_view.get_image<uint16_t>();
+        mve::RawImage::Ptr mask_raw_image = texture_view.get_mask<uint16_t>();
         raw_image = mve::image::crop<uint16_t>(raw_image, width, height, min_x, min_y, *math::Vec3us(65535, 0, 65535));
+        mask_raw_image = mve::image::crop<uint16_t>(mask_raw_image, width, height, min_x, min_y, *math::Vec3us(65535, 0, 65535));
         image = mve::image::raw_to_float_image(raw_image);
+        mask_image = mve::image::raw_to_float_image(mask_raw_image);
     }else{
         mve::ByteImage::Ptr byte_image;
+        mve::ByteImage::Ptr mask_byte_image;
         byte_image = mve::image::crop(texture_view.get_image<uint8_t>(), width, height, min_x, min_y, *math::Vec3uc(255, 0, 255));
+        mask_byte_image = mve::image::crop(texture_view.get_mask<uint8_t>(), width, height, min_x, min_y, *math::Vec3uc(255, 0, 255));
         image = mve::image::byte_to_float_image(byte_image);
+        mask_image = mve::image::byte_to_float_image(mask_byte_image);
     }
 
     if (settings.tone_mapping == TONE_MAPPING_GAMMA) {
@@ -143,7 +157,7 @@ generate_candidate(int label, TextureView const & texture_view,
 
     TexturePatchCandidate texture_patch_candidate =
         {Rect<int>(min_x, min_y, max_x, max_y),
-            TexturePatch::create(label, faces, texcoords, image)};
+            TexturePatch::create(label, faces, texcoords, image, mask_image)};
     return texture_patch_candidate;
 }
 
@@ -431,7 +445,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     }
     mve::FloatImage::Ptr image = mve::FloatImage::create(image_size, image_size, 3);
     //DEBUG image->fill_color(*math::Vec4uc(0, 255, 0, 255));
-    TexturePatch::Ptr texture_patch = TexturePatch::create(0, hole, texcoords, image);
+    TexturePatch::Ptr texture_patch = TexturePatch::create(0, hole, texcoords, image, image);
     std::size_t texture_patch_id;
     #pragma omp critical
     {
@@ -473,7 +487,11 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
 
     std::cout << "\tRunning... " << std::flush;
     #pragma omp parallel for schedule(dynamic)
+#if !defined(_MSC_VER)
     for (std::size_t i = 0; i < texture_views->size(); ++i) {
+#else
+    for (std::int64_t i = 0; i < texture_views->size(); ++i) {
+#endif
 
         std::vector<std::vector<std::size_t> > subgraphs;
         int const label = i + 1;
@@ -549,7 +567,11 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
         graph.get_subgraphs(0, &subgraphs);
 
         #pragma omp parallel for schedule(dynamic)
+#if !defined(_MSC_VER)
         for (std::size_t i = 0; i < subgraphs.size(); ++i) {
+#else
+        for (std::int64_t i = 0; i < subgraphs.size(); ++i) {
+#endif
             std::vector<std::size_t> const & subgraph = subgraphs[i];
 
             bool success = false;
@@ -577,7 +599,7 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
                 texcoords.insert(texcoords.end(), &projections[0], &projections[3]);
             }
             TexturePatch::Ptr texture_patch
-                = TexturePatch::create(0, unseen_faces, texcoords, image);
+                = TexturePatch::create(0, unseen_faces, texcoords, image, image);
             texture_patches->push_back(texture_patch);
             std::size_t texture_patch_id = texture_patches->size() - 1;
 

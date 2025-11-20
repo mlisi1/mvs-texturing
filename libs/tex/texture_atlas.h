@@ -44,6 +44,7 @@ class TextureAtlas {
         TexcoordIds texcoord_ids;
 
         mve::ImageBase::Ptr image;
+        mve::ImageBase::Ptr mask_image;
         mve::ByteImage::Ptr validity_mask;
 
         RectangularBin::Ptr bin;
@@ -62,6 +63,7 @@ class TextureAtlas {
         TexcoordIds const & get_texcoord_ids(void) const;
         Texcoords const & get_texcoords(void) const;
         mve::ImageBase::Ptr get_image(void) const;
+        mve::ImageBase::Ptr get_mask(void) const;
 
         bool insert(TexturePatch::ConstPtr texture_patch);
 
@@ -95,6 +97,15 @@ TextureAtlas::get_image(void) const {
         throw util::Exception("Texture atlas not finalized");
     }
     return image;
+}
+
+
+inline mve::ImageBase::Ptr
+TextureAtlas::get_mask(void) const {
+    if (!finalized) {
+        throw util::Exception("Texture atlas not finalized");
+    }
+    return mask_image;
 }
 
 inline bool

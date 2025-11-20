@@ -37,19 +37,20 @@ class TexturePatch {
         Faces faces;
         Texcoords texcoords;
         mve::FloatImage::Ptr image;
+        mve::FloatImage::Ptr mask_image;
         mve::ByteImage::Ptr validity_mask;
         mve::ByteImage::Ptr blending_mask;
 
     public:
         /** Constructs a texture patch. */
         TexturePatch(int _label, std::vector<std::size_t> const & _faces,
-            std::vector<math::Vec2f>  const & _texcoords, mve::FloatImage::Ptr _image);
+            std::vector<math::Vec2f>  const & _texcoords, mve::FloatImage::Ptr _image, mve::FloatImage::Ptr _mask_image);
 
         TexturePatch(TexturePatch const & texture_patch);
 
         static TexturePatch::Ptr create(TexturePatch::ConstPtr texture_patch);
         static TexturePatch::Ptr create(int label, std::vector<std::size_t> const & faces,
-            std::vector<math::Vec2f> const & texcoords, mve::FloatImage::Ptr image);
+            std::vector<math::Vec2f> const & texcoords, mve::FloatImage::Ptr image, mve::FloatImage::Ptr mask_image);
 
         TexturePatch::Ptr duplicate(void);
 
@@ -68,8 +69,10 @@ class TexturePatch {
         std::vector<math::Vec2f> const & get_texcoords(void) const;
 
         mve::FloatImage::Ptr get_image(void);
+        mve::FloatImage::Ptr get_mask(void);
 
         mve::FloatImage::ConstPtr get_image(void) const;
+        mve::FloatImage::ConstPtr get_mask(void) const;
         mve::ByteImage::ConstPtr get_validity_mask(void) const;
         mve::ByteImage::ConstPtr get_blending_mask(void) const;
 
@@ -86,6 +89,7 @@ class TexturePatch {
         int get_width(void) const;
         int get_height(void) const;
         int get_size(void) const;
+
 };
 
 inline TexturePatch::Ptr
@@ -95,8 +99,8 @@ TexturePatch::create(TexturePatch::ConstPtr texture_patch) {
 
 inline TexturePatch::Ptr
 TexturePatch::create(int label, std::vector<std::size_t> const & faces,
-    std::vector<math::Vec2f>  const & texcoords, mve::FloatImage::Ptr image) {
-    return std::make_shared<TexturePatch>(label, faces, texcoords, image);
+    std::vector<math::Vec2f>  const & texcoords, mve::FloatImage::Ptr image, mve::FloatImage::Ptr mask_image) {
+    return std::make_shared<TexturePatch>(label, faces, texcoords, image, mask_image);
 }
 
 inline TexturePatch::Ptr
@@ -127,6 +131,17 @@ TexturePatch::get_image(void) {
 inline mve::FloatImage::ConstPtr
 TexturePatch::get_image(void) const {
     return image;
+}
+
+
+inline mve::FloatImage::Ptr
+TexturePatch::get_mask(void) {
+    return mask_image;
+}
+
+inline mve::FloatImage::ConstPtr
+TexturePatch::get_mask(void) const {
+    return mask_image;
 }
 
 inline mve::ByteImage::ConstPtr
