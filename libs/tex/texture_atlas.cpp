@@ -202,6 +202,7 @@ TextureAtlas::apply_edge_padding(void) {
             for (int c = 0; c < 3; ++c) {
                 float norm = 0.0f;
                 float value = 0.0f;
+                float mask_value = 0.0f;
                 for (int j = -1; j <= 1; ++j) {
                     for (int i = -1; i <= 1; ++i) {
                         int nx = x + i;
@@ -213,6 +214,7 @@ TextureAtlas::apply_edge_padding(void) {
                             float w = gauss[(j + 1) * 3 + (i + 1)];
                             norm += w;
                             value += (img->at(nx, ny, c) / 255.0f) * w;
+                            mask_value = (msk->at(nx, ny, c) / 255.0f) * w;
                         }
                     }
                 }
@@ -222,7 +224,7 @@ TextureAtlas::apply_edge_padding(void) {
 
                 now_valid = true;
                 img->at(x, y, c) = (value / norm) * 255.0f;
-                // msk->at(x, y, c) = (value / norm) * 255.0f;
+                msk->at(x, y, c) = (mask_value / norm) * 255.0f;
             }
 
             if (now_valid) {

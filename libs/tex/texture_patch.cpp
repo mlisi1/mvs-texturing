@@ -114,6 +114,19 @@ TexturePatch::adjust_colors(std::vector<math::Vec3f> const & adjust_values) {
             std::copy(color.begin(), color.end(), &image->at(i, 0));
         }
     }
+    for (int i = 0; i < mask_image->get_pixel_amount(); ++i) {
+        if (validity_mask->at(i, 0) != 0){
+            // for (int c = 0; c < 3; ++c) {
+            //     mask_image->at(i, c) += iadjust_values->at(i, c);
+            // }
+            // math::Vec3f color(1.0f, 0.0f, 1.0f);
+            // std::copy(color.begin(), color.end(), &mask_image->at(i, 0));
+        } else {
+            math::Vec3f color(0.0f, 0.0f, 0.0f);
+            //DEBUG math::Vec3f color(1.0f, 0.0f, 1.0f);
+            std::copy(color.begin(), color.end(), &mask_image->at(i, 0));
+        }
+    }
 }
 
 bool TexturePatch::valid_pixel(math::Vec2f pixel) const {
@@ -175,13 +188,17 @@ TexturePatch::set_pixel_value(math::Vec2i pixel, math::Vec3f color) {
     assert(valid_pixel(pixel));
 
     std::copy(color.begin(), color.end(), &image->at(pixel[0], pixel[1], 0));
+
+    // TODO:find a way to generate sensible masks seams
+    math::Vec3f deb_color(0.0f, 0.0f, 0.0f);
+    std::copy(deb_color.begin(), deb_color.end(), &mask_image->at(pixel[0], pixel[1], 0));
     blending_mask->at(pixel[0], pixel[1], 0) = 128;
 }
 
 void
 TexturePatch::blend(mve::FloatImage::ConstPtr orig) {
     poisson_blend(orig, blending_mask, image, 1.0f);
-    // BLENDING SEEMS TO CREATO MORE ARTIFACTS
+    // BLENDING SEEMS TO CREATE MORE ARTIFACTS
     // poisson_blend(orig, blending_mask, mask_image, 1.0f);
 
     /* Invalidate all pixels outside the boundary. */
