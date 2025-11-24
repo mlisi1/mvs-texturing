@@ -38,7 +38,6 @@ TextureView::TextureView(std::size_t id, mve::CameraInfo const & camera,
 void
 TextureView::load_image(void) {
     if(image != NULL) return;
-    std::cout << "[DEBUG]: Loading images" << std::endl;
     grayscale = false;
     try {
         image = mve::image::load_file(image_file);
@@ -74,7 +73,6 @@ TextureView::load_image(void) {
 
     if(mask_image == NULL) {
 
-        std::cout << "[DEBUG]: Loading mask images" << std::endl;
         try {
             mask_image = mve::image::load_file(mask_image_file);
         } catch (...) {}

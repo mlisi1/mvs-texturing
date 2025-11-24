@@ -227,8 +227,6 @@ from_nvm_scene(std::string const & nvm_file, std::string const & mask_nvm_file,
             }
         }
 
-        std::cout << "[DEBUG]: Loading mask " << mask_nvm_cam.filename << std::endl;
-
         int const maxdim = std::max(image->width(), image->height());
         mve_cam.flen = mve_cam.flen / static_cast<float>(maxdim);
 
