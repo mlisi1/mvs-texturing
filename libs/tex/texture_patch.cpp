@@ -30,7 +30,12 @@ TexturePatch::TexturePatch(TexturePatch const & texture_patch) {
     faces = std::vector<std::size_t>(texture_patch.faces);
     texcoords = std::vector<math::Vec2f>(texture_patch.texcoords);
     image = texture_patch.image->duplicate();
-    mask_image = texture_patch.mask_image->duplicate();
+
+    if (texture_patch.mask_image == NULL) {
+        mask_image == NULL;
+    } else {
+        mask_image = texture_patch.mask_image->duplicate();
+    }    
     validity_mask = texture_patch.validity_mask->duplicate();
     if (texture_patch.blending_mask != NULL) {
         blending_mask = texture_patch.blending_mask->duplicate();
@@ -114,6 +119,10 @@ TexturePatch::adjust_colors(std::vector<math::Vec3f> const & adjust_values) {
             std::copy(color.begin(), color.end(), &image->at(i, 0));
         }
     }
+
+    if (mask_image == NULL) {
+        return;
+    }
     for (int i = 0; i < mask_image->get_pixel_amount(); ++i) {
         if (validity_mask->at(i, 0) != 0){
             // for (int c = 0; c < 3; ++c) {
@@ -188,11 +197,15 @@ TexturePatch::set_pixel_value(math::Vec2i pixel, math::Vec3f color) {
     assert(valid_pixel(pixel));
 
     std::copy(color.begin(), color.end(), &image->at(pixel[0], pixel[1], 0));
-
+    blending_mask->at(pixel[0], pixel[1], 0) = 128;
     // TODO:find a way to generate sensible masks seams
+
+    if (mask_image == NULL) {
+        return;
+    }
     math::Vec3f deb_color(0.0f, 0.0f, 0.0f);
     std::copy(deb_color.begin(), deb_color.end(), &mask_image->at(pixel[0], pixel[1], 0));
-    blending_mask->at(pixel[0], pixel[1], 0) = 128;
+    
 }
 
 void

@@ -45,7 +45,8 @@ condense_grayscale (typename Image<T>::ConstPtr image)
 
 void
 build_model(mve::TriangleMesh::ConstPtr mesh,
-    std::vector<TextureAtlas::Ptr> const & texture_atlases, ObjModel * obj_model)  {
+    std::vector<TextureAtlas::Ptr> const & texture_atlases, ObjModel * obj_model, 
+    ObjModel * masked_model, bool parse_masks)  {
 
     mve::TriangleMesh::VertexList const & mesh_vertices = mesh->get_vertices();
     mve::TriangleMesh::NormalList const & mesh_normals = mesh->get_vertex_normals();
@@ -60,13 +61,35 @@ build_model(mve::TriangleMesh::ConstPtr mesh,
     ObjModel::Groups & groups = obj_model->get_groups();
     MaterialLib & material_lib = obj_model->get_material_lib();
 
+    if (parse_masks) {
+
+        ObjModel::Vertices & mask_vertices = masked_model->get_vertices();
+        mask_vertices.insert(mask_vertices.begin(), mesh_vertices.begin(), mesh_vertices.end());
+        ObjModel::Normals & mask_normals = masked_model->get_normals();
+        mask_normals.insert(mask_normals.begin(), mesh_normals.begin(), mesh_normals.end());
+    }
+
     for (TextureAtlas::Ptr texture_atlas : texture_atlases) {
+
+        ObjModel::Group * mask_group = nullptr;
 
         Material material;
         const std::size_t n = material_lib.size();
         material.name = std::string("material") + util::string::get_filled(n, 4);
         material.diffuse_map = texture_atlas->get_image();
-        material.mask_diffuse_map = texture_atlas->get_mask();
+
+        if (texture_atlas->get_mask() != NULL) {
+            ObjModel::Groups & mask_groups = masked_model->get_groups();
+            MaterialLib & mask_material_lib = masked_model->get_material_lib();
+            Material masked_material;
+            const std::size_t n = mask_material_lib.size();
+            masked_material.name = std::string("mask_material") + util::string::get_filled(n, 4);
+            masked_material.diffuse_map = texture_atlas->get_mask();
+            mask_material_lib.push_back(masked_material);
+            mask_groups.push_back(ObjModel::Group());
+            mask_group = &mask_groups.back();
+            mask_group->material_name = masked_material.name;
+        }
 
         if (texture_atlas->is_grayscale()){
             // Use only first channel (other two should be the same)
@@ -93,6 +116,12 @@ build_model(mve::TriangleMesh::ConstPtr mesh,
         texcoords.insert(texcoords.end(), atlas_texcoords.begin(),
             atlas_texcoords.end());
 
+        if (parse_masks) {
+            ObjModel::TexCoords & mask_texcoords = masked_model->get_texcoords();
+            mask_texcoords.insert(mask_texcoords.end(), atlas_texcoords.begin(),
+            atlas_texcoords.end());
+        }
+
         for (std::size_t i = 0; i < atlas_faces.size(); ++i) {
             std::size_t mesh_face_pos = atlas_faces[i] * 3;
 
@@ -114,6 +143,14 @@ build_model(mve::TriangleMesh::ConstPtr mesh,
             std::copy(vertex_ids, vertex_ids + 3, face.vertex_ids);
             std::copy(texcoord_ids, texcoord_ids + 3, face.texcoord_ids);
             std::copy(normal_ids, normal_ids + 3, face.normal_ids);
+
+            if (parse_masks) {
+                mask_group->faces.push_back(ObjModel::Face());
+                ObjModel::Face & face = mask_group->faces.back();
+                std::copy(vertex_ids, vertex_ids + 3, face.vertex_ids);
+                std::copy(texcoord_ids, texcoord_ids + 3, face.texcoord_ids);
+                std::copy(normal_ids, normal_ids + 3, face.normal_ids);
+            }
         }
     }
     //TODO remove unreferenced vertices/normals.

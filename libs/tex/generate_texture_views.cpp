@@ -181,14 +181,12 @@ from_images_and_camera_files(std::string const & path,
 
 void
 from_nvm_scene(std::string const & nvm_file, std::string const & mask_nvm_file,
-    std::vector<TextureView> * texture_views)
+    std::vector<TextureView> * texture_views, bool parse_masks)
 {
     std::vector<mve::NVMCameraInfo> nvm_cams;
-    std::vector<mve::NVMCameraInfo> mask_nvm_cams;
     mve::Bundle::Ptr bundle = mve::load_nvm_bundle(nvm_file, &nvm_cams);
-    mve::Bundle::Ptr mask_bundle = mve::load_nvm_bundle(mask_nvm_file, &mask_nvm_cams);
     mve::Bundle::Cameras& cameras = bundle->get_cameras();
-    mve::Bundle::Cameras& mask_cameras = mask_bundle->get_cameras();
+    
 
     ProgressCounter view_counter("\tLoading", cameras.size());
     #pragma omp parallel for
@@ -199,28 +197,22 @@ from_nvm_scene(std::string const & nvm_file, std::string const & mask_nvm_file,
 #endif
         view_counter.progress<SIMPLE>();
         mve::CameraInfo& mve_cam = cameras[i];
-        mve::CameraInfo& mask_mve_cam = mask_cameras[i];
-        mve::NVMCameraInfo const& nvm_cam = nvm_cams[i];
-        mve::NVMCameraInfo const& mask_nvm_cam = mask_nvm_cams[i];
+        mve::NVMCameraInfo const& nvm_cam = nvm_cams[i];    
 
         mve::ImageBase::Ptr image = nullptr;
-        mve::ImageBase::Ptr mask_image = nullptr;
         try {
             image = mve::image::load_file(nvm_cam.filename);
-            mask_image = mve::image::load_file(mask_nvm_cam.filename);
         } catch (...) {}
 
-        if (image == nullptr && mask_image == nullptr){
+        if (image == nullptr){
             try{
                 image = mve::image::load_tiff_16_file(nvm_cam.filename);
-                mask_image = mve::image::load_tiff_16_file(mask_nvm_cam.filename);
             }catch (...) {}
         }
 
-        if (image == nullptr && mask_image == nullptr){
+        if (image == nullptr){
             try{
                 image = mve::image::load_tiff_float_file(nvm_cam.filename);
-                mask_image = mve::image::load_tiff_float_file(mask_nvm_cam.filename);
             }catch(const std::exception &e){
                 std::cerr << "Failed to load " << nvm_cam.filename << ": " << e.what();
                 exit(1);
@@ -230,10 +222,43 @@ from_nvm_scene(std::string const & nvm_file, std::string const & mask_nvm_file,
         int const maxdim = std::max(image->width(), image->height());
         mve_cam.flen = mve_cam.flen / static_cast<float>(maxdim);
 
-        int const mask_maxdim = std::max(mask_image->width(), mask_image->height());
-        mask_mve_cam.flen = mask_mve_cam.flen / static_cast<float>(mask_maxdim);
+        std::string mask_filename = "";
 
+        if (parse_masks) {
+            
+            std::vector<mve::NVMCameraInfo> mask_nvm_cams;
+            mve::Bundle::Ptr mask_bundle = mve::load_nvm_bundle(mask_nvm_file, &mask_nvm_cams);            
+            mve::Bundle::Cameras& mask_cameras = mask_bundle->get_cameras();
+            mve::CameraInfo& mask_mve_cam = mask_cameras[i];
+            mve::NVMCameraInfo const& mask_nvm_cam = mask_nvm_cams[i];
+            mve::ImageBase::Ptr mask_image = nullptr;
 
+            try {
+                mask_image = mve::image::load_file(mask_nvm_cam.filename);
+            } catch (...) {}
+
+            if (mask_image == nullptr){
+                try{
+                    mask_image = mve::image::load_tiff_16_file(mask_nvm_cam.filename);
+                }catch (...) {}
+            }
+
+            if (mask_image == nullptr){
+                try{
+                    mask_image = mve::image::load_tiff_float_file(mask_nvm_cam.filename);
+                }catch(const std::exception &e){
+                    std::cerr << "Failed to load mask" << mask_nvm_cam.filename << ": " << e.what();
+                    exit(1);
+                }
+            }
+
+            int const mask_maxdim = std::max(mask_image->width(), mask_image->height());
+            mask_mve_cam.flen = mask_mve_cam.flen / static_cast<float>(mask_maxdim);
+
+            mask_filename = mask_nvm_cam.filename;
+
+        }
+        
         switch (image->get_type()) {
         case mve::IMAGE_TYPE_FLOAT: {
             image = mve::image::image_undistort_vsfm<float>
@@ -251,7 +276,7 @@ from_nvm_scene(std::string const & nvm_file, std::string const & mask_nvm_file,
         }
 
         #pragma omp critical
-        texture_views->push_back(TextureView(i, mve_cam, nvm_cam.filename, mask_nvm_cam.filename));
+        texture_views->push_back(TextureView(i, mve_cam, nvm_cam.filename, mask_filename));
 
         view_counter.inc();
     }
@@ -262,6 +287,10 @@ generate_texture_views(std::string const & in_scene, std::string const & in_mask
     std::vector<TextureView> * texture_views, std::string const & tmp_dir)
 {
     /* Determine input format. */
+    bool parse_masks = false;
+    if (util::fs::file_exists(in_mask_scene.c_str())) {
+        parse_masks = true; 
+    };
 
     /* BUNDLEFILE */
     if (util::fs::file_exists(in_scene.c_str())) {
@@ -269,7 +298,7 @@ generate_texture_views(std::string const & in_scene, std::string const & in_mask
         std::string const & mask_file = in_mask_scene;
         std::string extension = util::string::uppercase(util::string::right(file, 3));
         if (extension == "NVM") {
-            from_nvm_scene(file, mask_file, texture_views);
+            from_nvm_scene(file, mask_file, texture_views, parse_masks);
         }
     }
 

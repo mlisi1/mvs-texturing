@@ -41,6 +41,11 @@ int main(int argc, char **argv) {
         std::exit(EXIT_FAILURE);
     }
 
+    bool parse_masks = false;
+    if (util::fs::file_exists(conf.in_mask_scene.c_str())) {
+        parse_masks = true; 
+    };
+
     std::string const out_dir = util::fs::dirname(conf.out_prefix);
 
     if (!util::fs::dir_exists(out_dir.c_str())) {
@@ -160,7 +165,7 @@ int main(int argc, char **argv) {
         tex::VertexProjectionInfos vertex_projection_infos;
         std::cout << "Generating texture patches:" << std::endl;
         tex::generate_texture_patches(graph, mesh, mesh_info, &texture_views,
-            conf.settings, &vertex_projection_infos, &texture_patches);
+            conf.settings, &vertex_projection_infos, &texture_patches, parse_masks);
 
         if (conf.settings.global_seam_leveling) {
             std::cout << "Running global seam leveling:" << std::endl;
@@ -200,11 +205,15 @@ int main(int argc, char **argv) {
     {
         std::cout << "Building objmodel:" << std::endl;
         tex::Model model;
-        tex::build_model(mesh, texture_atlases, &model);
+        tex::Model masked_model;
+        tex::build_model(mesh, texture_atlases, &model, &masked_model, parse_masks);
         timer.measure("Building OBJ model");
 
         std::cout << "\tSaving model... " << std::flush;
         tex::Model::save(model, conf.out_prefix);
+        if (parse_masks) {
+            tex::Model::save(masked_model, conf.out_prefix + "_masked");
+        }
         std::cout << "done." << std::endl;
         timer.measure("Saving");
     }
@@ -223,16 +232,20 @@ int main(int argc, char **argv) {
             generate_debug_embeddings(&texture_views);
             tex::VertexProjectionInfos vertex_projection_infos; // Will only be written
             tex::generate_texture_patches(graph, mesh, mesh_info, &texture_views,
-                conf.settings, &vertex_projection_infos, &texture_patches);
+                conf.settings, &vertex_projection_infos, &texture_patches, parse_masks);
             tex::generate_texture_atlases(&texture_patches, conf.settings, &texture_atlases, type, false);
         }
 
         std::cout << "Building debug objmodel:" << std::endl;
         {
             tex::Model model;
-            tex::build_model(mesh, texture_atlases, &model);
-            std::cout << "\tSaving model... " << std::flush;
+            tex::Model masked_model;
+            tex::build_model(mesh, texture_atlases, &model, &masked_model, parse_masks);
+            std::cout << "\tSaving model... \n" << std::flush;
             tex::Model::save(model, conf.out_prefix + "_view_selection");
+            if (parse_masks) {
+                tex::Model::save(masked_model, conf.out_prefix + "_masked" + "_view_selection");
+            }            
             std::cout << "done." << std::endl;
         }
     }

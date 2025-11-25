@@ -88,7 +88,8 @@ void generate_texture_patches(UniGraph const & graph,
     TextureViews * texture_views,
     Settings const & settings,
     VertexProjectionInfos * vertex_projection_infos,
-    TexturePatches * texture_patches);
+    TexturePatches * texture_patches,
+    bool parse_masks);
 
 /**
   * Runs the seam leveling procedure proposed by Ivanov and Lempitsky
@@ -115,7 +116,8 @@ generate_texture_atlases(TexturePatches * texture_patches,
   */
 void
 build_model(mve::TriangleMesh::ConstPtr mesh,
-    TextureAtlases const & texture_atlas, Model * model);
+    TextureAtlases const & texture_atlas, Model * model,
+    Model * masked_model, bool parse_masks);
 
 TEX_NAMESPACE_END
 

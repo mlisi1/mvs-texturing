@@ -101,21 +101,14 @@ TextureAtlas::insert(TexturePatch::ConstPtr texture_patch) {
 
     if (image->get_type() == mve::IMAGE_TYPE_FLOAT){
         copy_into<float>(texture_patch->get_image(), rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::FloatImage>(image), padding);
-        copy_into<float>(texture_patch->get_mask(), rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::FloatImage>(mask_image), padding);
     }else if (image->get_type() == mve::IMAGE_TYPE_UINT16){
         mve::RawImage::Ptr patch_image = float_to_raw_image(
                 texture_patch->get_image(), 0.0f, 1.0f);
-        mve::RawImage::Ptr patch_mask_image = float_to_raw_image(
-                texture_patch->get_mask(), 0.0f, 1.0f);
         copy_into<uint16_t>(patch_image, rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::RawImage>(image), padding);
-        copy_into<uint16_t>(patch_mask_image, rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::RawImage>(mask_image), padding);
     }else{
         mve::ByteImage::Ptr patch_image = mve::image::float_to_byte_image(
                 texture_patch->get_image(), 0.0f, 1.0f);
-        mve::ByteImage::Ptr patch_mask_image = mve::image::float_to_byte_image(
-                texture_patch->get_mask(), 0.0f, 1.0f);
         copy_into<uint8_t>(patch_image, rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::ByteImage>(image), padding);
-        copy_into<uint8_t>(patch_mask_image, rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::ByteImage>(mask_image), padding);
     }
 
     mve::ByteImage::ConstPtr patch_validity_mask = texture_patch->get_validity_mask();
@@ -140,6 +133,24 @@ TextureAtlas::insert(TexturePatch::ConstPtr texture_patch) {
             texcoords.push_back(texcoord);
         }
     }
+
+    if (texture_patch->get_mask() != NULL) {
+        if (image->get_type() == mve::IMAGE_TYPE_FLOAT){
+            copy_into<float>(texture_patch->get_mask(), rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::FloatImage>(mask_image), padding);
+        }else if (image->get_type() == mve::IMAGE_TYPE_UINT16){
+            mve::RawImage::Ptr patch_mask_image = float_to_raw_image(
+                    texture_patch->get_mask(), 0.0f, 1.0f);
+            copy_into<uint16_t>(patch_mask_image, rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::RawImage>(mask_image), padding);
+        }else{
+            mve::ByteImage::Ptr patch_mask_image = mve::image::float_to_byte_image(
+                    texture_patch->get_mask(), 0.0f, 1.0f);
+            copy_into<uint8_t>(patch_mask_image, rect.min_x, rect.min_y, std::dynamic_pointer_cast<mve::ByteImage>(mask_image), padding);
+        }
+        
+    } else {
+        mask_image = NULL;
+    }
+
     return true;
 }
 
@@ -154,7 +165,11 @@ TextureAtlas::apply_edge_padding(void) {
     const int width = image->width();
     const int height = image->height();
     typename mve::Image<T>::Ptr img = std::dynamic_pointer_cast<mve::Image<T>>(image);
-    typename mve::Image<T>::Ptr msk = std::dynamic_pointer_cast<mve::Image<T>>(mask_image);
+    typename mve::Image<T>::Ptr msk = nullptr;
+    if (mask_image != NULL) {
+        msk = std::dynamic_pointer_cast<mve::Image<T>>(mask_image);
+    }
+    
 
     math::Matrix<float, 3, 3> gauss;
     gauss[0] = 1.0f; gauss[1] = 2.0f; gauss[2] = 1.0f;
@@ -214,6 +229,7 @@ TextureAtlas::apply_edge_padding(void) {
                             float w = gauss[(j + 1) * 3 + (i + 1)];
                             norm += w;
                             value += (img->at(nx, ny, c) / 255.0f) * w;
+                            if (mask_image == NULL) { continue; };
                             mask_value = (msk->at(nx, ny, c) / 255.0f) * w;
                         }
                     }
@@ -224,6 +240,7 @@ TextureAtlas::apply_edge_padding(void) {
 
                 now_valid = true;
                 img->at(x, y, c) = (value / norm) * 255.0f;
+                if (mask_image == NULL) { continue; };
                 msk->at(x, y, c) = (mask_value / norm) * 255.0f;
             }
 

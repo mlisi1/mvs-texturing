@@ -95,11 +95,12 @@ Arguments parse_args(int argc, char **argv) {
         "How many threads to use. Set 1 for determinism.");
     args.add_option('\0', MAX_TEXTURE_SIZE, true,
         "Maximum size of output textures.");
+    args.add_option('\0', "masks", true,
+        "Masks reconstruction file.");
     args.parse(argc, argv);
 
     Arguments conf;
     conf.in_scene = args.get_nth_nonopt(0);
-    conf.in_mask_scene = args.get_nth_nonopt(3);
     conf.in_mesh = args.get_nth_nonopt(1);
     conf.out_prefix = util::fs::sanitize_path(args.get_nth_nonopt(2));
 
@@ -112,6 +113,7 @@ Arguments parse_args(int argc, char **argv) {
     conf.write_view_selection_model = false;
 
     conf.num_threads = -1;
+    conf.in_mask_scene = "";
 
     /* Handle optional arguments. */
     for (util::ArgResult const* i = args.next_option();
@@ -159,6 +161,8 @@ Arguments parse_args(int argc, char **argv) {
                 conf.num_threads = std::stoi(i->arg);
             } else if (i->opt->lopt == MAX_TEXTURE_SIZE) {
                 conf.settings.max_texture_size = std::stoi(i->arg);
+            } else if (i->opt->lopt == "masks") {
+                conf.in_mask_scene = i->arg;
             } else {
                 throw std::invalid_argument("Invalid long option");
             }

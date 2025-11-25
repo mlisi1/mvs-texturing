@@ -71,8 +71,8 @@ TextureView::load_image(void) {
         grayscale = true;
     }
 
-    if(mask_image == NULL) {
-
+    if(mask_image == NULL && mask_image_file != "") {
+        
         try {
             mask_image = mve::image::load_file(mask_image_file);
         } catch (...) {}

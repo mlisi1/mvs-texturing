@@ -128,28 +128,40 @@ generate_candidate(int label, TextureView const & texture_view,
         texcoords[i] = texcoords[i] - min;
     }
 
+
     mve::FloatImage::Ptr image;
-    mve::FloatImage::Ptr mask_image;
     if (view_image->get_type() == mve::IMAGE_TYPE_FLOAT){
         mve::FloatImage::Ptr float_image = texture_view.get_image<float>();
-        mve::FloatImage::Ptr mask_float_image = texture_view.get_mask<float>();
         image = mve::image::crop<float>(float_image, width, height, min_x, min_y, *math::Vec3f(3.402823466E38, 0, 3.402823466E38));
-        mask_image = mve::image::crop<float>(mask_float_image, width, height, min_x, min_y, *math::Vec3f(3.402823466E38, 0, 3.402823466E38));
     }else if (view_image->get_type() == mve::IMAGE_TYPE_UINT16){
         mve::RawImage::Ptr raw_image = texture_view.get_image<uint16_t>();
-        mve::RawImage::Ptr mask_raw_image = texture_view.get_mask<uint16_t>();
         raw_image = mve::image::crop<uint16_t>(raw_image, width, height, min_x, min_y, *math::Vec3us(65535, 0, 65535));
-        mask_raw_image = mve::image::crop<uint16_t>(mask_raw_image, width, height, min_x, min_y, *math::Vec3us(65535, 0, 65535));
         image = mve::image::raw_to_float_image(raw_image);
-        mask_image = mve::image::raw_to_float_image(mask_raw_image);
     }else{
         mve::ByteImage::Ptr byte_image;
-        mve::ByteImage::Ptr mask_byte_image;
         byte_image = mve::image::crop(texture_view.get_image<uint8_t>(), width, height, min_x, min_y, *math::Vec3uc(255, 0, 255));
-        mask_byte_image = mve::image::crop(texture_view.get_mask<uint8_t>(), width, height, min_x, min_y, *math::Vec3uc(255, 0, 255));
         image = mve::image::byte_to_float_image(byte_image);
-        mask_image = mve::image::byte_to_float_image(mask_byte_image);
     }
+
+    mve::FloatImage::Ptr mask_image = NULL;
+
+    if (texture_view.get_mask() != NULL) {
+        
+        if (view_image->get_type() == mve::IMAGE_TYPE_FLOAT){
+            mve::FloatImage::Ptr mask_float_image = texture_view.get_mask<float>();
+            mask_image = mve::image::crop<float>(mask_float_image, width, height, min_x, min_y, *math::Vec3f(3.402823466E38, 0, 3.402823466E38));
+        }else if (view_image->get_type() == mve::IMAGE_TYPE_UINT16){
+            mve::RawImage::Ptr mask_raw_image = texture_view.get_mask<uint16_t>();
+            mask_raw_image = mve::image::crop<uint16_t>(mask_raw_image, width, height, min_x, min_y, *math::Vec3us(65535, 0, 65535));
+            mask_image = mve::image::raw_to_float_image(mask_raw_image);
+        }else{
+            mve::ByteImage::Ptr mask_byte_image;
+            mask_byte_image = mve::image::crop(texture_view.get_mask<uint8_t>(), width, height, min_x, min_y, *math::Vec3uc(255, 0, 255));
+            mask_image = mve::image::byte_to_float_image(mask_byte_image);
+        }
+
+    }    
+
 
     if (settings.tone_mapping == TONE_MAPPING_GAMMA) {
         mve::image::gamma_correct(image, 2.2f);
@@ -164,7 +176,7 @@ generate_candidate(int label, TextureView const & texture_view,
 bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     mve::TriangleMesh::ConstPtr mesh, mve::MeshInfo const & mesh_info,
     std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
-    std::vector<TexturePatch::Ptr> * texture_patches) {
+    std::vector<TexturePatch::Ptr> * texture_patches, bool parse_masks) {
 
     mve::TriangleMesh::FaceList const & mesh_faces = mesh->get_faces();
     mve::TriangleMesh::VertexList const & vertices = mesh->get_vertices();
@@ -444,8 +456,12 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
         }
     }
     mve::FloatImage::Ptr image = mve::FloatImage::create(image_size, image_size, 3);
+    mve::FloatImage::Ptr mask_image = NULL;
+            if (parse_masks) {
+                mask_image = mve::FloatImage::create(image_size, image_size, 3);
+            }
     //DEBUG image->fill_color(*math::Vec4uc(0, 255, 0, 255));
-    TexturePatch::Ptr texture_patch = TexturePatch::create(0, hole, texcoords, image, image);
+    TexturePatch::Ptr texture_patch = TexturePatch::create(0, hole, texcoords, image, mask_image);
     std::size_t texture_patch_id;
     #pragma omp critical
     {
@@ -475,7 +491,7 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
     mve::MeshInfo const & mesh_info,
     std::vector<TextureView> * texture_views, Settings const & settings,
     std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
-    std::vector<TexturePatch::Ptr> * texture_patches) {
+    std::vector<TexturePatch::Ptr> * texture_patches, bool parse_masks) {
 
     util::WallTimer timer;
 
@@ -577,7 +593,7 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
             bool success = false;
             if (settings.hole_filling) {
                 success = fill_hole(subgraph, graph, mesh, mesh_info,
-                    vertex_projection_infos, texture_patches);
+                    vertex_projection_infos, texture_patches, parse_masks);
             }
 
             if (success) {
@@ -593,13 +609,17 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
 
         if (!unseen_faces.empty()) {
             mve::FloatImage::Ptr image = mve::FloatImage::create(3, 3, 3);
+            mve::FloatImage::Ptr mask_image = NULL;
+            if (parse_masks) {
+                mask_image = mve::FloatImage::create(3, 3, 3);
+            }
             std::vector<math::Vec2f> texcoords;
             for (std::size_t i = 0; i < unseen_faces.size(); ++i) {
                 math::Vec2f projections[] = {{2.0f, 1.0f}, {1.0f, 1.0f}, {1.0f, 2.0f}};
                 texcoords.insert(texcoords.end(), &projections[0], &projections[3]);
             }
             TexturePatch::Ptr texture_patch
-                = TexturePatch::create(0, unseen_faces, texcoords, image, image);
+                = TexturePatch::create(0, unseen_faces, texcoords, image, mask_image);
             texture_patches->push_back(texture_patch);
             std::size_t texture_patch_id = texture_patches->size() - 1;
 
